@@ -56,8 +56,6 @@ EPA_API_KEY=your_api_key_here
 # 使用真實 API 數據
 python aqi_monitor.py
 
-# 使用範例數據測試
-python test_sample_data.py
 ```
 
 ## 輸出檔案
