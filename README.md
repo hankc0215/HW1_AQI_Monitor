@@ -8,7 +8,8 @@
 
 - 🌍 **即時數據獲取**: 串接環境部 API 獲取全台 84 個測站即時 AQI 數據
 - 🗺️ **互動式地圖**: 使用 Folium 生成互動式地圖，顯示各測站空氣品質狀況
-- 🎨 **三色分類系統**: 綠色(0-50良好)、黃色(51-100普通)、紅色(101+不健康)
+- � **動態網站**: Flask 網站伺服器，重新整理即可更新數據
+- � **三色分類系統**: 綠色(0-50良好)、黃色(51-100普通)、紅色(101+不健康)
 - 📏 **空間計算**: 計算每個測站到台北車站的距離
 - 📊 **資料匯出**: 將完整資料匯出為 CSV 檔案
 - 📈 **統計分析**: 自動生成 AQI 等級分布統計
@@ -16,18 +17,20 @@
 ## 檔案結構
 
 ```
-HW1/
-├── aqi_monitor.py          # 主程式
-├── requirements.txt        # 套件依賴
-├── setup.py               # 環境安裝腳本
-├── test_sample_data.py    # 範例數據測試
-├── .env                   # 環境變數設定
-├── .gitignore            # Git 忽略檔案
-├── README.md             # 專案說明
-├── data/                 # 資料目錄
-└── outputs/              # 輸出目錄
-    ├── aqi_map_*.html    # 互動式地圖
-    └── aqi_data_*.csv    # CSV 資料檔案
+HW1_AQI_Monitor/
+├── web_server.py          # 🆕 動態網站伺服器
+├── aqi_monitor.py         # 核心監測程式
+├── main.py               # 主程式入口
+├── requirements.txt       # 套件依賴
+├── setup.py              # 環境安裝腳本
+├── .env                  # 環境變數設定
+├── .gitignore           # Git 忽略檔案
+├── README.md            # 專案說明
+├── WEB_SERVER_GUIDE.md   # 🆕 網站使用指南
+├── data/                # 資料目錄
+└── outputs/             # 輸出目錄
+    ├── aqi_map_*.html   # 靜態地圖檔案
+    └── aqi_data_*.csv   # CSV 資料檔案
 ```
 
 ## 安裝與執行
@@ -52,20 +55,42 @@ EPA_API_KEY=your_api_key_here
 
 ### 3. 執行程式
 
+#### 🌐 **動態網站 (推薦)**
+```bash
+# 啟動網站伺服器
+python web_server.py
+
+# 訪問網站
+http://localhost:5000
+```
+
+#### 📊 **靜態分析**
 ```bash
 # 使用真實 API 數據
 python aqi_monitor.py
 
+# 主程式入口
+python main.py
 ```
+
+## 🌐 線上網站
+
+### **動態 AQI 監測網站**
+- **網站特色**: 重新整理即可更新數據
+- **互動功能**: 點擊測站查看詳細資訊
+- **即時統計**: 顯示各等級測站分布
+- **自動更新**: 每 5 分鐘自動重新整理
+
+> 💡 **提示**: 啟動 `python web_server.py` 後即可在本地訪問，也可部署到雲端平台
 
 ## 輸出檔案
 
-### 地圖檔案
-- 檔案位置: `outputs/aqi_map_YYYYMMDD_HHMMSS.html`
-- 格式: 互動式 HTML 地圖
-- 特色: 可縮放、點擊查看詳細資訊
+### 🗺️ 地圖檔案
+- **靜態地圖**: `outputs/aqi_map_YYYYMMDD_HHMMSS.html`
+- **動態地圖**: http://localhost:5000 (推薦)
+- **特色**: 可縮放、點擊查看詳細資訊
 
-### CSV 資料檔
+### 📊 CSV 資料檔
 - 檔案位置: `outputs/aqi_data_YYYYMMDD_HHMMSS.csv`
 - 包含欄位:
   - 測站名稱
@@ -83,8 +108,10 @@ python aqi_monitor.py
 - **Python 版本**: 3.7+
 - **主要套件**:
   - `requests`: HTTP 請求
-  - `folium`: 地圖視覺化
+  - `folium`: 靜態地圖視覺化
+  - `flask`: 動態網站框架
   - `python-dotenv`: 環境變數管理
+- **前端技術**: HTML + JavaScript + Leaflet.js
 - **API 來源**: 環境部開放資料平台
 - **座標系統**: WGS84
 - **距離計算**: Haversine 公式
@@ -106,11 +133,44 @@ distance = 2 * R * arcsin(√(sin²(Δφ/2) + cos φ1 ⋅ cos φ2 ⋅ sin²(Δλ
 - **格式**: JSON
 - **更新頻率**: 每小時
 
+## 🚀 部署選項
+
+### **本地部署**
+```bash
+python web_server.py
+# 訪問: http://localhost:5000
+```
+
+### **雲端部署**
+- **Heroku**: 免費層級支援 Flask
+- **PythonAnywhere**: 專為 Python 設計
+- **VPS**: 完全控制權
+
+詳細部署指南請參考 `WEB_SERVER_GUIDE.md`
+
+## 📱 網站功能
+
+### **即時更新**
+- 重新整理頁面獲取最新數據
+- 每 5 分鐘自動重新整理
+- 手動重新整理按鈕
+
+### **互動地圖**
+- 點擊測站查看詳細資訊
+- 懸停顯示快速資訊
+- 縮放和平移功能
+
+### **統計面板**
+- 即時測站統計
+- AQI 等級分布
+- 最後更新時間
+
 ## 開發者資訊
 
 - 開發日期: 2026-03-01
 - Python 版本: 3.14
 - 最後更新: 即時數據
+- GitHub: https://github.com/hankc0215/HW1_AQI_Monitor
 
 ## 授權
 
