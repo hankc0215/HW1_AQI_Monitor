@@ -32,15 +32,17 @@ OUTDOOR_KEYWORDS = [
     '空地', '閒置空間',
     '公園', '綠地',
     '滯洪池', '水池',
+    '風景區', '管理處',  # <-- 新增：風景區相關
 ]
 
 def classify_indoor(name):
     """
     根據設施名稱判斷是否為室內
-    Returns: True (室內), False (室外), None (無法判斷)
+    Returns: True (室內), False (室外)
+    無法判斷的預設為室內（True）
     """
     if pd.isna(name) or not isinstance(name, str):
-        return None
+        return True  # 無法判斷 -> 預設室內
     
     name = str(name).strip()
     
@@ -54,8 +56,8 @@ def classify_indoor(name):
         if keyword in name:
             return True
     
-    # 無法判斷
-    return None
+    # 無法判斷 -> 預設室內
+    return True
 
 def add_is_indoor_column():
     """新增 is_indoor 欄位到資料集"""
