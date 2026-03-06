@@ -1,0 +1,296 @@
+#!/usr/bin/env python3
+"""
+避難所位置驗位置驗證
+檢查避難所經緯度是否位於正確的縣市和鄉鎮
+"""
+
+import pandas as pd
+import requests
+import json
+import time
+from typing import Dict, List, Tuple
+import os
+
+# 台灣各縣市的大致邊界（簡化版）
+# 經度範圍 [min_lon, max_lon], 緯度範圍 [min_lat, max_lat]
+TAIWAN_COUNTY_BOUNDS = {
+    '新北市': [121.3, 122.1, 24.8, 25.3],
+    '臺北市': [121.4, 121.7, 24.9, 25.2],
+    '基隆市': [121.6, 121.8, 25.1, 25.3],
+    '桃園市': [121.0, 121.4, 24.6, 25.1],
+    '新竹縣': [120.8, 121.3, 24.3, 24.8],
+    '新竹市': [120.9, 121.1, 24.6, 24.9],
+    '苗栗縣': [120.6, 121.2, 24.1, 24.7],
+    '臺中市': [120.5, 121.3, 24.0, 24.4],
+    '彰化縣': [120.3, 120.7, 23.8, 24.2],
+    '南投縣': [120.6, 121.3, 23.6, 24.2],
+    '雲林縣': [120.2, 120.6, 23.5, 23.9],
+    '嘉義縣': [120.2, 120.7, 23.3, 23.6],
+    '嘉義市': [120.4, 120.6, 23.4, 23.6],
+    '臺南市': [120.1, 120.5, 22.8, 23.4],
+    '高雄市': [120.2, 120.7, 22.4, 23.2],
+    '屏東縣': [120.5, 121.0, 21.9, 22.8],
+    '宜蘭縣': [121.6, 122.0, 24.3, 24.8],
+    '花蓮縣': [121.2, 121.7, 22.9, 24.2],
+    '臺東縣': [120.8, 121.4, 22.3, 23.2],
+    '澎湖縣': [119.4, 119.7, 23.4, 23.7],
+    '金門縣': [118.2, 118.5, 24.3, 24.5],
+    '連江縣': [119.9, 120.2, 26.1, 26.4]
+}
+
+def is_point_in_county(lat: float, lon: float, county: str) -> bool:
+    """
+    檢查點是否位於指定縣市邊界內
+    """
+    if county not in TAIWAN_COUNTY_BOUNDS:
+        return False
+    
+    min_lon, max_lon, min_lat, max_lat = TAIWAN_COUNTY_BOUNDS[county]
+    
+    return (min_lon <= lon <= max_lon) and (min_lat <= lat <= max_lat)
+
+def get_reverse_geocode(lat: float, lon: float) -> Dict:
+    """
+    使用逆地理編碼獲取座標對應的地址資訊
+    使用 Nominatim API (OpenStreetMap)
+    """
+    try:
+        # 添加延遲避免請求過於頻繁
+        time.sleep(1)
+        
+        url = f"https://nominatim.openstreetmap.org/reverse"
+        params = {
+            'format': 'json',
+            'lat': lat,
+            'lon': lon,
+            'accept-language': 'zh-TW,zh'
+        }
+        
+        headers = {
+            'User-Agent': 'AQI Shelter Location Validator'
+        }
+        
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            return {
+                'success': True,
+                'address': data.get('address', {}),
+                'display_name': data.get('display_name', ''),
+                'county': extract_county_from_address(data.get('address', {})),
+                'township': extract_township_from_address(data.get('address', {}))
+            }
+        else:
+            return {'success': False, 'error': f'HTTP {response.status_code}'}
+            
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+def extract_county_from_address(address: Dict) -> str:
+    """
+    從地址資訊中提取縣市
+    """
+    # 優先順序：state > county > city
+    for key in ['state', 'county', 'city']:
+        if key in address and address[key]:
+            value = address[key]
+            # 處理可能的縣市名稱變體
+            if '市' in value or '縣' in value:
+                return value
+    
+    return ''
+
+def extract_township_from_address(address: Dict) -> str:
+    """
+    從地址資訊中提取鄉鎮市區
+    """
+    # 優先順序：suburb > town > village > district
+    for key in ['suburb', 'town', 'village', 'district']:
+        if key in address and address[key]:
+            return address[key]
+    
+    return ''
+
+def load_shelter_data():
+    """讀取避難所資料"""
+    filepath = 'outputs/shelter_shelters_with_indoor.csv'
+    
+    try:
+        df = pd.read_csv(filepath, encoding='utf-8-sig')
+        print(f"載入 {len(df)} 筆避難收容處所資料")
+        return df
+    except Exception as e:
+        print(f"讀取避難所資料失敗: {e}")
+        return pd.DataFrame()
+
+def validate_shelter_locations():
+    """驗證避難所位置"""
+    print("="*70)
+    print("避難所位置驗證")
+    print("="*70)
+    
+    # 載入資料
+    shelter_df = load_shelter_data()
+    
+    if shelter_df.empty:
+        print("無法載入避難所資料")
+        return None
+    
+    print(f"開始驗證 {len(shelter_df)} 個避難所位置...")
+    
+    # 統計計數器
+    county_mismatch = 0
+    township_mismatch = 0
+    geocode_failed = 0
+    validation_results = []
+    
+    for idx, row in shelter_df.iterrows():
+        try:
+            # 取得避難所資料
+            shelter_id = row.iloc[0]
+            shelter_name = row.iloc[6]
+            recorded_county = row.iloc[1]  # 記錄的縣市
+            shelter_lat = float(row.iloc[5])
+            shelter_lon = float(row.iloc[4])
+            
+            if shelter_lat == 0 or shelter_lon == 0:
+                continue
+            
+            # 1. 檢查是否在台灣範圍內
+            taiwan_bounds = [119.0, 122.1, 21.8, 25.3]  # [min_lon, max_lon, min_lat, max_lat]
+            if not (taiwan_bounds[0] <= shelter_lon <= taiwan_bounds[1] and 
+                   taiwan_bounds[2] <= shelter_lat <= taiwan_bounds[3]):
+                continue
+            
+            # 2. 基本邊界檢查
+            county_in_bounds = is_point_in_county(shelter_lat, shelter_lon, recorded_county)
+            
+            # 3. 逆地理編碼驗證（抽樣檢查，避免API限制）
+            geocode_result = {'success': False}
+            
+            # 只對前100個進行詳細驗證（避免API限制）
+            if idx < 100:
+                geocode_result = get_reverse_geocode(shelter_lat, shelter_lon)
+                
+                if not geocode_result['success']:
+                    geocode_failed += 1
+                    print(f"  逆地理編碼失敗: {shelter_name} - {geocode_result.get('error', 'Unknown error')}")
+            
+            # 4. 分析結果
+            result = {
+                'shelter_id': shelter_id,
+                'shelter_name': shelter_name,
+                'recorded_county': recorded_county,
+                'lat': shelter_lat,
+                'lon': shelter_lon,
+                'county_in_bounds': county_in_bounds,
+                'geocode_success': geocode_result['success'],
+                'geocoded_county': geocode_result.get('county', '') if geocode_result['success'] else '',
+                'geocoded_township': geocode_result.get('township', '') if geocode_result['success'] else '',
+                'display_name': geocode_result.get('display_name', '') if geocode_result['success'] else '',
+                'county_match': False,
+                'township_match': False,
+                'issues': []
+            }
+            
+            # 檢查縣市匹配
+            if geocode_result['success'] and geocode_result.get('county'):
+                geocoded_county = geocode_result.get('county', '')
+                
+                # 處理縣市名稱變體
+                county_match = False
+                if recorded_county in geocoded_county or geocoded_county in recorded_county:
+                    county_match = True
+                elif '市' in recorded_county and '市' in geocoded_county:
+                    if recorded_county.replace('市', '') in geocoded_county.replace('市', ''):
+                        county_match = True
+                elif '縣' in recorded_county and '縣' in geocoded_county:
+                    if recorded_county.replace('縣', '') in geocoded_county.replace('縣', ''):
+                        county_match = True
+                
+                result['county_match'] = county_match
+                
+                if not county_match:
+                    county_mismatch += 1
+                    result['issues'].append(f"縣市不匹配: 記錄={recorded_county}, 實際={geocoded_county}")
+            
+            # 檢查鄉鎮匹配（如果有資料）
+            if geocode_result['success'] and geocode_result.get('township'):
+                # 從避難所名稱中提取可能的鄉鎮資訊
+                shelter_township = ''
+                if '鄉' in shelter_name or '鎮' in shelter_name or '區' in shelter_name:
+                    # 簡單的鄉鎮提取邏輯
+                    for suffix in ['鄉', '鎮', '區']:
+                        if suffix in shelter_name:
+                            parts = shelter_name.split(suffix)
+                            if len(parts) > 1:
+                                shelter_township = parts[0] + suffix
+                                break
+                
+                geocoded_township = geocode_result.get('township', '')
+                
+                township_match = False
+                if shelter_township and geocoded_township:
+                    if shelter_township in geocoded_township or geocoded_township in shelter_township:
+                        township_match = True
+                
+                result['township_match'] = township_match
+                result['shelter_township'] = shelter_township
+                
+                if not township_match and shelter_township:
+                    township_mismatch += 1
+                    result['issues'].append(f"鄉鎮不匹配: 名稱={shelter_township}, 實際={geocoded_township}")
+            
+            # 檢查邊界問題
+            if not county_in_bounds:
+                result['issues'].append("座標不在記錄縣市的邊界範圍內")
+            
+            validation_results.append(result)
+            
+            # 進度顯示
+            if (idx + 1) % 50 == 0:
+                print(f"已處理 {idx + 1}/{len(shelter_df)} 個避難所...")
+                
+        except Exception as e:
+            print(f"處理避難所 {idx} 時發生錯誤: {e}")
+            continue
+    
+    # 轉換為 DataFrame
+    results_df = pd.DataFrame(validation_results)
+    
+    # 輸出統計
+    print(f"\n驗證完成!")
+    print(f"總共驗證: {len(results_df)} 個避難所")
+    print(f"縣市不匹配: {county_mismatch} 個")
+    print(f"鄉鎮不匹配: {township_mismatch} 個")
+    print(f"逆地理編碼失敗: {geocode_failed} 個")
+    
+    # 顯示問題案例
+    problematic = results_df[results_df['issues'].apply(len) > 0]
+    print(f"\n發現位置問題的避難所: {len(problematic)} 個")
+    
+    if len(problematic) > 0:
+        print("\n問題案例 (前10筆):")
+        for _, row in problematic.head(10).iterrows():
+            print(f"  {row['shelter_name']} ({row['recorded_county']})")
+            for issue in row['issues']:
+                print(f"    - {issue}")
+            if row['display_name']:
+                print(f"    實際地址: {row['display_name']}")
+    
+    # 保存結果
+    output_path = 'outputs/shelter_location_validation.csv'
+    results_df.to_csv(output_path, index=False, encoding='utf-8-sig')
+    print(f"\n驗證結果已儲存至: {output_path}")
+    
+    # 生成問題清單
+    if len(problematic) > 0:
+        problem_path = 'outputs/shelter_location_issues.csv'
+        problematic.to_csv(problem_path, index=False, encoding='utf-8-sig')
+        print(f"問題清單已儲存至: {problem_path}")
+    
+    return results_df
+
+if __name__ == "__main__":
+    validate_shelter_locations()
