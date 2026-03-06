@@ -291,12 +291,12 @@ def create_map():
     # ===== 圖層控制 =====
     folium.LayerControl().add_to(m)
     
-    # ===== AQI 圖例 =====
+    # ===== AQI 圖例 (無陰影) =====
     legend_html = '''
     <div style="position: fixed; 
                 bottom: 50px; left: 50px; width: 200px; 
                 background-color: white; border:2px solid grey; z-index:9999; 
-                font-size:12px; padding: 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.3);">
+                font-size:12px; padding: 10px; border-radius: 5px;">
         <h4 style="margin: 0 0 10px 0; text-align: center;">AQI 空氣品質指標</h4>
         <p style="margin: 5px 0;"><span style="display: inline-block; width: 12px; height: 12px; background-color: #00E400; border-radius: 50%; margin-right: 8px;"></span>0-50 良好</p>
         <p style="margin: 5px 0;"><span style="display: inline-block; width: 12px; height: 12px; background-color: #FFFF00; border-radius: 50%; margin-right: 8px;"></span>51-100 普通</p>
