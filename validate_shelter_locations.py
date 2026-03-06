@@ -11,31 +11,32 @@ import time
 from typing import Dict, List, Tuple
 import os
 
-# 台灣各縣市的大致邊界（簡化版）
+# 台灣各縣市的大致邊界（放寬版）
 # 經度範圍 [min_lon, max_lon], 緯度範圍 [min_lat, max_lat]
+# 邊界放寬 0.2 度約 22km，容許一定誤差
 TAIWAN_COUNTY_BOUNDS = {
-    '新北市': [121.3, 122.1, 24.8, 25.3],
-    '臺北市': [121.4, 121.7, 24.9, 25.2],
-    '基隆市': [121.6, 121.8, 25.1, 25.3],
-    '桃園市': [121.0, 121.4, 24.6, 25.1],
-    '新竹縣': [120.8, 121.3, 24.3, 24.8],
-    '新竹市': [120.9, 121.1, 24.6, 24.9],
-    '苗栗縣': [120.6, 121.2, 24.1, 24.7],
-    '臺中市': [120.5, 121.3, 24.0, 24.4],
-    '彰化縣': [120.3, 120.7, 23.8, 24.2],
-    '南投縣': [120.6, 121.3, 23.6, 24.2],
-    '雲林縣': [120.2, 120.6, 23.5, 23.9],
-    '嘉義縣': [120.2, 120.7, 23.3, 23.6],
-    '嘉義市': [120.4, 120.6, 23.4, 23.6],
-    '臺南市': [120.1, 120.5, 22.8, 23.4],
-    '高雄市': [120.2, 120.7, 22.4, 23.2],
-    '屏東縣': [120.5, 121.0, 21.9, 22.8],
-    '宜蘭縣': [121.6, 122.0, 24.3, 24.8],
-    '花蓮縣': [121.2, 121.7, 22.9, 24.2],
-    '臺東縣': [120.8, 121.4, 22.3, 23.2],
-    '澎湖縣': [119.4, 119.7, 23.4, 23.7],
-    '金門縣': [118.2, 118.5, 24.3, 24.5],
-    '連江縣': [119.9, 120.2, 26.1, 26.4]
+    '新北市': [121.1, 122.3, 24.6, 25.5],
+    '臺北市': [121.2, 121.9, 24.7, 25.4],
+    '基隆市': [121.4, 122.0, 25.0, 25.5],
+    '桃園市': [120.8, 121.6, 24.4, 25.3],
+    '新竹縣': [120.6, 121.5, 24.1, 25.0],
+    '新竹市': [120.7, 121.3, 24.4, 25.1],
+    '苗栗縣': [120.4, 121.4, 23.9, 24.9],
+    '臺中市': [120.3, 121.5, 23.8, 24.6],
+    '彰化縣': [120.1, 120.9, 23.6, 24.4],
+    '南投縣': [120.4, 121.5, 23.4, 24.4],
+    '雲林縣': [120.0, 120.8, 23.3, 24.1],
+    '嘉義縣': [120.0, 120.9, 23.1, 23.8],
+    '嘉義市': [120.2, 120.8, 23.2, 23.8],
+    '臺南市': [119.9, 120.7, 22.6, 23.6],
+    '高雄市': [120.0, 120.9, 22.2, 23.4],
+    '屏東縣': [120.3, 121.2, 21.7, 23.0],
+    '宜蘭縣': [121.4, 122.2, 24.1, 25.0],
+    '花蓮縣': [121.0, 121.9, 22.7, 24.4],
+    '臺東縣': [120.6, 121.6, 22.1, 23.4],
+    '澎湖縣': [119.2, 119.9, 23.2, 23.9],
+    '金門縣': [118.0, 118.7, 24.1, 24.7],
+    '連江縣': [119.7, 120.4, 25.9, 26.6]
 }
 
 def is_point_in_county(lat: float, lon: float, county: str) -> bool:
@@ -48,6 +49,59 @@ def is_point_in_county(lat: float, lon: float, county: str) -> bool:
     min_lon, max_lon, min_lat, max_lat = TAIWAN_COUNTY_BOUNDS[county]
     
     return (min_lon <= lon <= max_lon) and (min_lat <= lat <= max_lat)
+
+def is_point_far_from_county(lat: float, lon: float, county: str) -> bool:
+    """
+    檢查點是否遠離縣市邊界（超出太多）
+    使用更嚴格的原始邊界
+    """
+    # 原始嚴格邊界
+    STRICT_BOUNDS = {
+        '新北市': [121.3, 122.1, 24.8, 25.3],
+        '臺北市': [121.4, 121.7, 24.9, 25.2],
+        '基隆市': [121.6, 121.8, 25.1, 25.3],
+        '桃園市': [121.0, 121.4, 24.6, 25.1],
+        '新竹縣': [120.8, 121.3, 24.3, 24.8],
+        '新竹市': [120.9, 121.1, 24.6, 24.9],
+        '苗栗縣': [120.6, 121.2, 24.1, 24.7],
+        '臺中市': [120.5, 121.3, 24.0, 24.4],
+        '彰化縣': [120.3, 120.7, 23.8, 24.2],
+        '南投縣': [120.6, 121.3, 23.6, 24.2],
+        '雲林縣': [120.2, 120.6, 23.5, 23.9],
+        '嘉義縣': [120.2, 120.7, 23.3, 23.6],
+        '嘉義市': [120.4, 120.6, 23.4, 23.6],
+        '臺南市': [120.1, 120.5, 22.8, 23.4],
+        '高雄市': [120.2, 120.7, 22.4, 23.2],
+        '屏東縣': [120.5, 121.0, 21.9, 22.8],
+        '宜蘭縣': [121.6, 122.0, 24.3, 24.8],
+        '花蓮縣': [121.2, 121.7, 22.9, 24.2],
+        '臺東縣': [120.8, 121.4, 22.3, 23.2],
+        '澎湖縣': [119.4, 119.7, 23.4, 23.7],
+        '金門縣': [118.2, 118.5, 24.3, 24.5],
+        '連江縣': [119.9, 120.2, 26.1, 26.4]
+    }
+    
+    if county not in STRICT_BOUNDS:
+        return True  # 未知縣市標記為遠離
+    
+    min_lon, max_lon, min_lat, max_lat = STRICT_BOUNDS[county]
+    
+    # 計算超出邊界的距離
+    lon_offset = 0
+    lat_offset = 0
+    
+    if lon < min_lon:
+        lon_offset = min_lon - lon
+    elif lon > max_lon:
+        lon_offset = lon - max_lon
+    
+    if lat < min_lat:
+        lat_offset = min_lat - lat
+    elif lat > max_lat:
+        lat_offset = lat - max_lat
+    
+    # 如果超出邊界超過 0.1 度（約 11km），標記為遠離
+    return lon_offset > 0.1 or lat_offset > 0.1
 
 def get_reverse_geocode(lat: float, lon: float) -> Dict:
     """
@@ -163,8 +217,11 @@ def validate_shelter_locations():
                    taiwan_bounds[2] <= shelter_lat <= taiwan_bounds[3]):
                 continue
             
-            # 2. 基本邊界檢查
+            # 2. 基本邊界檢查（放寬版）
             county_in_bounds = is_point_in_county(shelter_lat, shelter_lon, recorded_county)
+            
+            # 3. 遠離邊界檢查（嚴格版）
+            is_far_from_county = is_point_far_from_county(shelter_lat, shelter_lon, recorded_county)
             
             # 3. 逆地理編碼驗證（抽樣檢查，避免API限制）
             geocode_result = {'success': False}
@@ -185,6 +242,7 @@ def validate_shelter_locations():
                 'lat': shelter_lat,
                 'lon': shelter_lon,
                 'county_in_bounds': county_in_bounds,
+                'far_from_county': is_far_from_county,
                 'geocode_success': geocode_result['success'],
                 'geocoded_county': geocode_result.get('county', '') if geocode_result['success'] else '',
                 'geocoded_township': geocode_result.get('township', '') if geocode_result['success'] else '',
@@ -243,8 +301,10 @@ def validate_shelter_locations():
                     result['issues'].append(f"鄉鎮不匹配: 名稱={shelter_township}, 實際={geocoded_township}")
             
             # 檢查邊界問題
-            if not county_in_bounds:
-                result['issues'].append("座標不在記錄縣市的邊界範圍內")
+            if is_far_from_county:
+                result['issues'].append("座標遠離記錄縣市邊界（超出11公里以上）")
+            elif not county_in_bounds:
+                result['issues'].append("座標在記錄縣市邊界邊緣（容許範圍）")
             
             validation_results.append(result)
             
@@ -265,6 +325,14 @@ def validate_shelter_locations():
     print(f"縣市不匹配: {county_mismatch} 個")
     print(f"鄉鎮不匹配: {township_mismatch} 個")
     print(f"逆地理編碼失敗: {geocode_failed} 個")
+    
+    # 統計邊界問題
+    far_boundary = results_df[results_df['far_from_county'] == True]
+    edge_boundary = results_df[(results_df['far_from_county'] == False) & 
+                            (results_df['county_in_bounds'] == False)]
+    
+    print(f"遠離邊界（>11km）: {len(far_boundary)} 個")
+    print(f"邊界邊緣（容許範圍）: {len(edge_boundary)} 個")
     
     # 顯示問題案例
     problematic = results_df[results_df['issues'].apply(len) > 0]
