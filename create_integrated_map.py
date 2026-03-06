@@ -211,9 +211,11 @@ def create_map():
     
     aqi_layer.add_to(m)
     
-    # ===== 圖層 B: 避難收容處所 =====
-    indoor_layer = folium.FeatureGroup(name='避難所-室內', show=True)
-    outdoor_layer = folium.FeatureGroup(name='避難所-室外', show=True)
+    # ===== 圖層 B: 避難收容處所（使用 MarkerCluster 優化）=====
+    # 室內避難所叢集
+    indoor_cluster = MarkerCluster(name='避難所-室內').add_to(m)
+    # 室外避難所叢集  
+    outdoor_cluster = MarkerCluster(name='避難所-室外').add_to(m)
     
     # 驗證計數器
     validation_passed = 0
@@ -270,7 +272,7 @@ def create_map():
                     popup=folium.Popup(popup_content, max_width=250),
                     tooltip=f"{name} (室內)",
                     icon=icon
-                ).add_to(indoor_layer)
+                ).add_to(indoor_cluster)
             else:
                 # 室外：綠色樹木圖標
                 icon = folium.Icon(color='green', icon='tree', prefix='fa')
@@ -279,15 +281,13 @@ def create_map():
                     popup=folium.Popup(popup_content, max_width=250),
                     tooltip=f"{name} (室外)",
                     icon=icon
-                ).add_to(outdoor_layer)
+                ).add_to(outdoor_cluster)
                 
         except Exception as e:
             print(f"處理避難所時發生錯誤: {e}")
             continue
     
-    indoor_layer.add_to(m)
-    outdoor_layer.add_to(m)
-    
+    # MarkerCluster 已自動加入地圖，無需額外添加
     # ===== 圖層控制 =====
     folium.LayerControl().add_to(m)
     
