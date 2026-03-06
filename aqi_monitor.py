@@ -22,13 +22,22 @@ load_dotenv(encoding='utf-8')
 
 class AQIMonitor:
     def __init__(self):
-        # 直接讀取 .env 檔案
-        self.api_key = "5a37aebe-f3cb-4aeb-bdae-fd285e2808e2"  # 臨時直接設定
+        # 從環境變數讀取設定
+        self.api_key = os.getenv('EPA_API_KEY', '')
         self.base_url = "https://airquality.epa.gov.tw/api/v2"
         self.aqi_data = None
-        self.taipei_station = (25.0478, 121.5170)  # 台北車站座標
         
-        if not self.api_key:
+        # 從環境變數讀取台北車站座標
+        taipei_lat = float(os.getenv('TAIPEI_STATION_LAT', '25.0478'))
+        taipei_lon = float(os.getenv('TAIPEI_STATION_LON', '121.5170'))
+        self.taipei_station = (taipei_lat, taipei_lon)
+        
+        # CRS 設定
+        self.default_crs = os.getenv('DEFAULT_CRS', 'EPSG:4326')
+        self.taiwan_crs = os.getenv('TAIWAN_CRS', 'EPSG:3826')
+        self.output_crs = os.getenv('OUTPUT_CRS', 'EPSG:4326')
+        
+        if not self.api_key or self.api_key == 'your_api_key_here':
             print(f"DEBUG: API Key = '{self.api_key}'")
             print("WARNING: 請在 .env 檔案中設定 EPA_API_KEY")
             print("   範例: EPA_API_KEY=your_api_key_here")
